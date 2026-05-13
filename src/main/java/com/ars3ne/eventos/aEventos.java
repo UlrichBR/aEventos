@@ -38,9 +38,12 @@ import com.ars3ne.eventos.utils.ConfigUpdater;
 import com.ars3ne.eventos.utils.EventoConfigFile;
 import com.ars3ne.eventos.utils.MenuConfigFile;
 import com.henryfabio.minecraft.inventoryapi.manager.InventoryManager;
+
+import me.ulrich.clans.data.ClanData;
+import me.ulrich.clans.interfaces.UClans;
 import net.milkbowl.vault.economy.Economy;
-import net.sacredlabyrinth.phaed.simpleclans.SimpleClans;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -49,6 +52,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Optional;
 
 public class aEventos extends JavaPlugin {
 
@@ -59,12 +63,11 @@ public class aEventos extends JavaPlugin {
     private static final CacheManager cache = new CacheManager();
     private final AutoStarter autostart = new AutoStarter();
 
-    private SimpleClans clan = null;
     private static final LegendChatHook lc_hook = new LegendChatHook();
     private Economy econ = null;
 
-    private boolean hooked_massivefactions = false;
-    private boolean hooked_yclans = false;
+    private boolean hooked_uclans = false;
+    private static UClans api_uclans = null;
     private boolean is_reloaded = true;
 
     private final EventoListener setup_listener = new EventoListener();
@@ -265,8 +268,8 @@ public class aEventos extends JavaPlugin {
     }
 
     private void setupAddons() {
-        if(!setupSimpleClans() && !setupMassiveFactions() && !setupyClans()) {
-            Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cSimpleClans, MassiveFactions e yClans não encontrados.");
+        if(!setupUClans()) {
+            Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cUltimateClans não encontrados.");
         }
         if(!setupLegendChat()) {
             Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cLegendChat não encontrado.");
@@ -289,25 +292,16 @@ public class aEventos extends JavaPlugin {
         }
     }
 
-    private boolean setupSimpleClans() {
-        Plugin simpleclans = getServer().getPluginManager().getPlugin("SimpleClans");
-        if(simpleclans == null) return false;
-        clan = ((SimpleClans) simpleclans);
-        return true;
-    }
-
-    private boolean setupMassiveFactions() {
-        Plugin factions = getServer().getPluginManager().getPlugin("Factions");
-        if(factions == null) return false;
-        hooked_massivefactions = true;
-        return true;
-    }
-
-    private boolean setupyClans() {
-        Plugin yclans = getServer().getPluginManager().getPlugin("yClans");
-        if(yclans == null) return false;
-        hooked_yclans = true;
-        return true;
+    private boolean setupUClans() {
+    	if(getServer().getPluginManager().isPluginEnabled("UltimateClans")) {
+    		UClans uclans = (UClans) getServer().getPluginManager().getPlugin("UltimateClans");
+            
+            this.hooked_uclans = true;
+            this.api_uclans = uclans;
+            return true;
+    	}
+		return false;
+        
     }
 
     private boolean setupPlaceholderAPI() {
@@ -337,17 +331,11 @@ public class aEventos extends JavaPlugin {
         return chat_manager;
     }
 
-    public SimpleClans getSimpleClans() {
-        return this.clan;
-    }
-
     public Economy getEconomy() { return this.econ; }
 
     public static CacheManager getCacheManager() { return cache; }
 
-    public boolean isHookedMassiveFactions() { return this.hooked_massivefactions; }
-
-    public boolean isHookedyClans() { return this.hooked_yclans; }
+    public boolean isHookedUClans() { return this.hooked_uclans; }
 
     public static aEventos getInstance() {
         return (aEventos) Bukkit.getServer().getPluginManager().getPlugin("aEventos");
@@ -363,6 +351,26 @@ public class aEventos extends JavaPlugin {
     public static void updateTags() {
         tag_manager.setup();
         cache.updateCache();
+    }
+
+	public static UClans getApi_uclans() {
+		return api_uclans;
+	}
+
+
+    public static int getClanMembers(Player p) {
+
+        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("ultimateclans") && aEventos.getInstance().isHookedUClans()) {
+        	
+            if(!getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) return -1;
+            
+            Optional<ClanData> clan_player = getApi_uclans().getPlayerAPI().getPlayerClan(p.getUniqueId());
+        	
+        	
+            return clan_player.get().getMembers().size();
+        }
+
+        return -1;
     }
 
 }

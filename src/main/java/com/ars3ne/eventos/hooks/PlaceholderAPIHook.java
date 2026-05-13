@@ -31,7 +31,6 @@ import com.ars3ne.eventos.aEventos;
 import com.ars3ne.eventos.utils.EventoConfigFile;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.List;
@@ -56,22 +55,22 @@ public class PlaceholderAPIHook extends PlaceholderExpansion {
     }
 
     @Override
-    public @NotNull String getAuthor(){
+    public String getAuthor(){
         return plugin.getDescription().getAuthors().toString();
     }
 
     @Override
-    public @NotNull String getIdentifier(){
+    public String getIdentifier(){
         return "aeventos";
     }
 
     @Override
-    public @NotNull String getVersion(){
+    public String getVersion(){
         return plugin.getDescription().getVersion();
     }
 
     @Override
-    public String onPlaceholderRequest(Player player, @NotNull String identifier){
+    public String onPlaceholderRequest(Player player, String identifier){
 
         if(player == null){
             return "";

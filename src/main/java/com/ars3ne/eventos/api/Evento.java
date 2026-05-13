@@ -577,6 +577,8 @@ public class Evento implements EventoInterface{
         }
 
     }
+    
+    
 
     public YamlConfiguration getConfig() {
         return this.config;

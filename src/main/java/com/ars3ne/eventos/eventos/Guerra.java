@@ -36,10 +36,10 @@ import com.ars3ne.eventos.listeners.eventos.GuerraListener;
 import com.cryptomorin.xseries.XItemStack;
 import com.cryptomorin.xseries.messages.ActionBar;
 import com.iridium.iridiumcolorapi.IridiumColorAPI;
-import com.massivecraft.factions.entity.Faction;
-import com.massivecraft.factions.entity.MPlayer;
-import net.sacredlabyrinth.phaed.simpleclans.Clan;
-import net.sacredlabyrinth.phaed.simpleclans.ClanPlayer;
+
+import me.ulrich.clans.data.ClanData;
+import me.ulrich.clans.data.PlayerData;
+
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.WorldBorder;
@@ -48,7 +48,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.potion.PotionEffect;
-import yclans.api.yClansAPI;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -58,16 +57,13 @@ public class Guerra extends Evento {
     private final YamlConfiguration config;
     private final GuerraListener listener = new GuerraListener();
 
-    private yClansAPI yclans_api;
 
     private final int enable_pvp, pickup_time, min_guilds, max_players;
     private boolean pvp_enabled, ended = false;
     private final boolean actionbar_enabled, border_enabled, ffa, defined_items;
     private final String hook;
 
-    private final HashMap<ClanPlayer, Clan> simpleclans_clan_participants = new HashMap<>();
-    private final HashMap<MPlayer, Faction> massivefactions_factions_participants = new HashMap<>();
-    private final HashMap<yclans.model.ClanPlayer, yclans.model.Clan> yclans_clan_participants = new HashMap<>();
+    private final HashMap<PlayerData, ClanData> uclans_clans = new HashMap<>();
 
     private final HashMap<OfflinePlayer, Integer> kills = new HashMap<>();
 
@@ -95,12 +91,50 @@ public class Guerra extends Evento {
 
         this.border = Bukkit.getWorld(config.getString("Locations.Entrance.world")).getWorldBorder();
 
-        if(hook.equalsIgnoreCase("yclans")) {
-            yclans_api = yClansAPI.yclansapi;
-        }
 
     }
 
+    public void setFF(List<Player> players, boolean value) {
+    	
+    	for(Player p: players) {
+    		if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) continue;
+            
+            Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(p.getUniqueId());
+            Optional<ClanData> clan_player = aEventos.getApi_uclans().getPlayerAPI().getPlayerClan(p.getUniqueId());
+            if(!clan_player.isPresent() && !player_data.isPresent()) continue;
+            
+            uclans_clans.put(player_data.get(), clan_player.get());
+            clan_player.get().setFf(true);
+    	}
+
+    }
+    
+    public void setFFUUID(List<UUID> players, boolean value) {
+    	
+    	for(UUID p: players) {
+    		if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p)) continue;
+            
+            Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(p);
+            Optional<ClanData> clan_player = aEventos.getApi_uclans().getPlayerAPI().getPlayerClan(p);
+            if(!clan_player.isPresent() && !player_data.isPresent()) continue;
+            
+            uclans_clans.put(player_data.get(), clan_player.get());
+            clan_player.get().setFf(true);
+    	}
+
+    }
+    
+    public void removeUUID(UUID uuid) {
+    	if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(uuid)) return;
+        
+        Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(uuid);
+        if(uclans_clans.containsKey(player_data.get())) {
+        	uclans_clans.remove(player_data.get());
+        }
+    	
+    	
+    }
+    
     @Override
     public void start() {
 
@@ -109,61 +143,10 @@ public class Guerra extends Evento {
         listener.setEvento();
 
         // Se o servidor tiver SimpleClans, então ative o friendly fire.
-        if(hook.equalsIgnoreCase("simpleclans") && aEventos.getInstance().getSimpleClans() != null) {
-            for(Player p: getPlayers()) {
-                if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) != null) {
-                    simpleclans_clan_participants.put(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p), aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).getClan());
-                    if(ffa) aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(true);
-                }
-            }
 
-            // Se a quantidade de clans for menor do que o mínimo, então cancele o evento.
-            if(getTotalGuilds() < this.min_guilds) {
-
-                if(aEventos.getInstance().getConfig().getBoolean("Bungeecord.Enabled") && config.getString("Locations.Server") != null){
-                    BungeecordHook.stopEvento("noguilds");
-                }
-
-                List<String> no_guild = config.getStringList("Messages.No guilds");
-                for(String s : no_guild) {
-                    Bukkit.broadcastMessage(IridiumColorAPI.process(s.replace("&", "§").replace("@name", config.getString("Evento.Title"))));
-                }
-                stop();
-                return;
-            }
-        }
-
-        // Se o servidor tiver MassiveFactions, então verifique a quantidade de facções.
-        if(hook.equalsIgnoreCase("massivefactions") && aEventos.getInstance().isHookedMassiveFactions()) {
-
-            for(Player p: getPlayers()) {
-                    massivefactions_factions_participants.put(MPlayer.get(p), MPlayer.get(p).getFaction());
-                    if(ffa) aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(true);
-            }
-
-            if(getTotalGuilds() < this.min_guilds) {
-                List<String> no_guild = config.getStringList("Messages.No guilds");
-                for(String s : no_guild) {
-                    Bukkit.broadcastMessage(IridiumColorAPI.process(s.replace("&", "§").replace("@name", config.getString("Evento.Title"))));
-                }
-                stop();
-                return;
-            }
-
-        }
 
         // Se o servidor tiver yClans, então verifique a quantidade de clãs.
-        if(hook.equalsIgnoreCase("yclans") && aEventos.getInstance().isHookedyClans()) {
-
-            for(Player p: getPlayers()) {
-                if(yclans_api == null || yclans_api.getPlayer(p) == null) continue;
-                yclans.model.ClanPlayer clan_player = yclans_api.getPlayer(p);
-                if(!clan_player.hasClan()) continue;
-                yclans_clan_participants.put(clan_player, clan_player.getClan());
-                if(ffa) clan_player.getClan().setFriendlyFireAlly(true);
-                if(ffa) clan_player.getClan().setFriendlyFireMember(true);
-            }
-        }
+        setFF(getPlayers(), true);
 
         // Se os itens setados estão ativados, então os obtenha.
         if(defined_items) {
@@ -290,28 +273,15 @@ public class Guerra extends Evento {
         }
 
         // Se o clã do jogador já bateu o limite de jogadores máximo, retorne.
-        if(getTotalGuildPlayers(p) > this.max_players) {
+        if(aEventos.getClanMembers(p) > this.max_players) {
             p.sendMessage(IridiumColorAPI.process(config.getString("Messages.Maximum").replace("&", "§").replace("@name", config.getString("Evento.Title"))));
             return;
         }
 
         // Se o jogador não está em um clan ou facção, retorne.
-        if(hook.equalsIgnoreCase("simpleclans") && aEventos.getInstance().getSimpleClans() != null) {
-            if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) == null) {
-                p.sendMessage(IridiumColorAPI.process(config.getString("Messages.No guild").replace("&", "§").replace("@name", config.getString("Evento.Title"))));
-                return;
-            }
-        }
 
-        if(hook.equalsIgnoreCase("massivefactions")) {
-            if(!MPlayer.get(p).hasFaction()) {
-                p.sendMessage(IridiumColorAPI.process(config.getString("Messages.No guild").replace("&", "§").replace("@name", config.getString("Evento.Title"))));
-                return;
-            }
-        }
-
-        if(hook.equalsIgnoreCase("yclans")) {
-            if(yclans_api == null || yclans_api.getPlayer(p) == null || !yclans_api.getPlayer(p).hasClan()) {
+        if(hook.equalsIgnoreCase("ultimateclans")) {
+            if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) {
                 p.sendMessage(IridiumColorAPI.process(config.getString("Messages.No guild").replace("&", "§").replace("@name", config.getString("Evento.Title"))));
                 return;
             }
@@ -357,26 +327,11 @@ public class Guerra extends Evento {
     public void eliminate(Player p) {
 
         // Desative o friendly-fire do jogador.
-        if(hook.equalsIgnoreCase("simpleclans") && aEventos.getInstance().getSimpleClans() != null) {
-            if(simpleclans_clan_participants.containsKey(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p))) {
-                simpleclans_clan_participants.remove(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p));
-                if(ffa) aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(false);
-            }
-        }
 
-        if(hook.equalsIgnoreCase("massivefactions") && aEventos.getInstance().isHookedMassiveFactions()) {
-            if(ffa) aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(false);
-            massivefactions_factions_participants.remove(MPlayer.get(p));
-        }
+       setFFUUID(Arrays.asList(p.getUniqueId()), false);
 
-        if(hook.equalsIgnoreCase("yclans") && aEventos.getInstance().isHookedyClans()) {
-            if(yclans_api == null || yclans_api.getPlayer(p) == null) return;
-            yclans.model.ClanPlayer clan_player = yclans_api.getPlayer(p);
-            yclans_clan_participants.remove(clan_player);
-            if(ffa) clan_player.getClan().setFriendlyFireAlly(false);
-            if(ffa) clan_player.getClan().setFriendlyFireMember(false);
-        }
-
+       removeUUID(p.getUniqueId());
+       
         PlayerLoseEvent lose = new PlayerLoseEvent(p, config.getString("filename").substring(0, config.getString("filename").length() - 4), getType());
         Bukkit.getPluginManager().callEvent(lose);
 
@@ -409,19 +364,9 @@ public class Guerra extends Evento {
 
         String winner_guild = null;
 
-        if(hook.equalsIgnoreCase("simpleclans")) {
-            this.setWinners(simpleclans_clan_participants.values().stream().findFirst().get().getTag(), this.kills);
-            winner_guild = simpleclans_clan_participants.values().stream().findFirst().get().getTag();
-        }
-
-        if(hook.equalsIgnoreCase("massivefactions")) {
-            this.setWinners(massivefactions_factions_participants.values().stream().findFirst().get().getName(), this.kills);
-            winner_guild = massivefactions_factions_participants.values().stream().findFirst().get().getName();
-        }
-
         if(hook.equalsIgnoreCase("yclans")) {
-            this.setWinners(yclans_clan_participants.values().stream().findFirst().get().getTag(), this.kills);
-            winner_guild = yclans_clan_participants.values().stream().findFirst().get().getTag();
+            this.setWinners(uclans_clans.values().stream().findFirst().get().getTag(), this.kills);
+            winner_guild = uclans_clans.values().stream().findFirst().get().getTag();
         }
 
         // Mande a mensagem da coleta de itens.
@@ -491,21 +436,10 @@ public class Guerra extends Evento {
 
                 for(OfflinePlayer p: sorted.keySet()) {
 
-                    if(hook.equalsIgnoreCase("simpleclans")) {
-                        if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).getClan() != simpleclans_clan_participants.values().toArray()[0]) {
-                            sorted.remove(p);
-                        }
-                    }
-
-                    if(hook.equalsIgnoreCase("massivefactions")) {
-                        if(MPlayer.get(p).getFaction() != massivefactions_factions_participants.values().toArray()[0]) {
-                            sorted.remove(p);
-                        }
-                    }
 
                     if(hook.equalsIgnoreCase("yclans")) {
-                        if(yclans_api == null || yclans_api.getPlayer((Player) p) == null || !yclans_api.getPlayer((Player) p).hasClan()) continue;
-                        if(yclans_api.getPlayer((Player) p).getClan() != yclans_clan_participants.values().toArray()[0]) {
+                        if(aEventos.getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) continue;
+                        if(aEventos.getApi_uclans().getPlayerAPI().getPlayerClan(p.getUniqueId()).get() != uclans_clans.values().toArray()[0]) {
                             sorted.remove(p);
                         }
                     }
@@ -546,19 +480,12 @@ public class Guerra extends Evento {
         }
 
         // Desative o friendly-fire dos jogadores.
-        for (ClanPlayer p : simpleclans_clan_participants.keySet()) {
-            p.setFriendlyFire(false);
+
+        for(PlayerData p: uclans_clans.keySet()) {
+            setFFUUID(Arrays.asList(p.getUuid()), false);
         }
 
-        for(yclans.model.ClanPlayer p: yclans_clan_participants.keySet()) {
-            if(!ffa) continue;
-            yclans_clan_participants.get(p).setFriendlyFireMember(false);
-            yclans_clan_participants.get(p).setFriendlyFireAlly(false);
-        }
-
-        simpleclans_clan_participants.clear();
-        massivefactions_factions_participants.clear();
-        yclans_clan_participants.clear();
+        uclans_clans.clear();
 
         // Remova o listener do evento e chame a função cancel.
         HandlerList.unregisterAll(listener);
@@ -571,27 +498,13 @@ public class Guerra extends Evento {
 
     private int getEnemiesTotal(Player p) {
 
-        if(hook.equalsIgnoreCase("simpleclans")) {
-            if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) == null) return 0;
-            return (int) simpleclans_clan_participants.keySet()
-                    .stream()
-                    .filter(map -> map.getClan() != aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).getClan())
-                    .count();
-        }
 
-        if(hook.equalsIgnoreCase("massivefactions")) {
-            if(MPlayer.get(p).getFaction() == null) return 0;
-            return (int) massivefactions_factions_participants.keySet()
-                    .stream()
-                    .filter(map -> map.getFaction() != MPlayer.get(p).getFaction())
-                    .count();
-        }
 
         if(hook.equalsIgnoreCase("yclans")) {
-            if(yclans_api.getPlayer(p) == null || !yclans_api.getPlayer(p).hasClan()) return 0;
-            return (int) yclans_clan_participants.keySet()
+            if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) return 0;
+            return (int) uclans_clans.keySet()
                     .stream()
-                    .filter(map -> map.getClan() != yclans_api.getPlayer(p).getClan())
+                    .filter(map -> map != aEventos.getApi_uclans().getPlayerAPI().getPlayerData(p.getUniqueId()).get())
                     .count();
         }
 
@@ -601,49 +514,14 @@ public class Guerra extends Evento {
     private int getTotalGuilds() {
 
 
-        if(hook.equalsIgnoreCase("simpleclans")) {
-            return (int) simpleclans_clan_participants.values().stream().distinct().count();
-        }
-
-        if(hook.equalsIgnoreCase("massivefactions")) {
-            return (int) massivefactions_factions_participants.values().stream().distinct().count();
-        }
-
         if(hook.equalsIgnoreCase("yclans")) {
-            return (int) yclans_clan_participants.values().stream().distinct().count();
+            return (int) uclans_clans.values().stream().distinct().count();
         }
 
         return -1;
 
     }
 
-    private int getTotalGuildPlayers(Player p) {
 
-        if(hook.equalsIgnoreCase("simpleclans")) {
-            if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) == null) return 0;
-            return (int) simpleclans_clan_participants.keySet()
-                    .stream()
-                    .filter(map -> map.getClan() == aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).getClan())
-                    .count();
-        }
-
-        if(hook.equalsIgnoreCase("massivefactions")) {
-            if(MPlayer.get(p).getFaction() == null) return 0;
-            return (int) massivefactions_factions_participants.keySet()
-                    .stream()
-                    .filter(map -> map.getFaction() == MPlayer.get(p).getFaction())
-                    .count();
-        }
-
-        if(hook.equalsIgnoreCase("yclans")) {
-            if(yclans_api.getPlayer(p) == null || !yclans_api.getPlayer(p).hasClan()) return 0;
-            return (int) yclans_clan_participants.keySet()
-                    .stream()
-                    .filter(map -> map.getClan() == yclans_api.getPlayer(p).getClan())
-                    .count();
-        }
-
-        return -1;
-    }
 
 }

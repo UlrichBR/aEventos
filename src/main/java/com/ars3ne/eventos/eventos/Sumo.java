@@ -33,31 +33,29 @@ import com.ars3ne.eventos.api.events.PlayerLoseEvent;
 import com.ars3ne.eventos.listeners.eventos.SumoListener;
 import com.cryptomorin.xseries.XItemStack;
 import com.iridium.iridiumcolorapi.IridiumColorAPI;
-import com.massivecraft.factions.entity.Faction;
-import com.massivecraft.factions.entity.MFlag;
-import com.massivecraft.factions.entity.MPlayer;
-import net.sacredlabyrinth.phaed.simpleclans.ClanPlayer;
+
+import me.ulrich.clans.data.ClanData;
+import me.ulrich.clans.data.PlayerData;
+
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
-import yclans.api.yClansAPI;
-import yclans.model.Clan;
 
-import java.util.ArrayList;
+
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public class Sumo extends Evento {
 
     private final YamlConfiguration config;
     private final SumoListener listener = new SumoListener();
 
-    private yClansAPI yclans_api;
 
-    private final ArrayList<ClanPlayer> simpleclans_clans = new ArrayList<>();
-    private final HashMap<MPlayer, Faction> massivefactions_factions = new HashMap<>();
-    private final HashMap<yclans.model.ClanPlayer, Clan> yclans_clans = new HashMap<>();
+    private final HashMap<PlayerData, ClanData> uclans_clans = new HashMap<>();
 
     private final boolean defined_items;
     public Sumo(YamlConfiguration config) {
@@ -66,10 +64,48 @@ public class Sumo extends Evento {
         this.config = config;
         this.defined_items = config.getBoolean("Itens.Enabled");
 
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("yclans")) {
-            yclans_api = yClansAPI.yclansapi;
-        }
 
+    }
+    
+    public void setFF(List<Player> players, boolean value) {
+    	
+    	for(Player p: players) {
+    		if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p.getUniqueId())) continue;
+            
+            Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(p.getUniqueId());
+            Optional<ClanData> clan_player = aEventos.getApi_uclans().getPlayerAPI().getPlayerClan(p.getUniqueId());
+            if(!clan_player.isPresent() && !player_data.isPresent()) continue;
+            
+            uclans_clans.put(player_data.get(), clan_player.get());
+            clan_player.get().setFf(true);
+    	}
+
+    }
+    
+    public void setFFUUID(List<UUID> players, boolean value) {
+    	
+    	for(UUID p: players) {
+    		if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(p)) continue;
+            
+            Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(p);
+            Optional<ClanData> clan_player = aEventos.getApi_uclans().getPlayerAPI().getPlayerClan(p);
+            if(!clan_player.isPresent() && !player_data.isPresent()) continue;
+            
+            uclans_clans.put(player_data.get(), clan_player.get());
+            clan_player.get().setFf(true);
+    	}
+
+    }
+    
+    public void removeUUID(UUID uuid) {
+    	if(!aEventos.getApi_uclans().getPlayerAPI().hasClan(uuid)) return;
+        
+        Optional<PlayerData> player_data = aEventos.getApi_uclans().getPlayerAPI().getPlayerData(uuid);
+        if(uclans_clans.containsKey(player_data.get())) {
+        	uclans_clans.remove(player_data.get());
+        }
+    	
+    	
     }
 
     @Override
@@ -80,32 +116,9 @@ public class Sumo extends Evento {
         listener.setEvento();
 
         // Se o servidor tiver SimpleClans, então ative o friendly fire.
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("simpleclans") && aEventos.getInstance().getSimpleClans() != null) {
-            for (Player p : getPlayers()) {
-                if (aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) != null) {
-                    simpleclans_clans.add(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p));
-                    aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(true);
-                }
-            }
-        }
 
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("massivefactions") && aEventos.getInstance().isHookedMassiveFactions()) {
-            for (Player p : getPlayers()) {
-                massivefactions_factions.put(MPlayer.get(p), MPlayer.get(p).getFaction());
-                MPlayer.get(p).getFaction().setFlag(MFlag.ID_FRIENDLYFIRE, true);
-            }
-        }
 
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("yclans") && aEventos.getInstance().isHookedyClans()) {
-            for(Player p: getPlayers()) {
-                if(yclans_api == null || yclans_api.getPlayer(p) == null) continue;
-                yclans.model.ClanPlayer clan_player = yclans_api.getPlayer(p);
-                if(!clan_player.hasClan()) continue;
-                yclans_clans.put(clan_player, clan_player.getClan());
-                clan_player.getClan().setFriendlyFireAlly(true);
-                clan_player.getClan().setFriendlyFireMember(true);
-            }
-        }
+        setFF(getPlayers(), true);
 
         // Se os itens setados estão ativados, então os obtenha.
         if(defined_items) {
@@ -137,23 +150,12 @@ public class Sumo extends Evento {
         }
 
         // Desative o friendly-fire do jogador.
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("simpleclans") && aEventos.getInstance().getSimpleClans() != null) {
-            simpleclans_clans.remove(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p));
-            if(aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p) != null) aEventos.getInstance().getSimpleClans().getClanManager().getClanPlayer(p).setFriendlyFire(false);
-        }
 
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("massivefactions") && aEventos.getInstance().isHookedMassiveFactions()) {
-            massivefactions_factions.remove(MPlayer.get(p));
-            if(getClanMembers(p) < 1) MPlayer.get(p).getFaction().setFlag(MFlag.ID_FRIENDLYFIRE, false);
-        }
-
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("yclans") && aEventos.getInstance().isHookedyClans() && !isOpen()) {
-            if(yclans_api == null || yclans_api.getPlayer(p) == null || isOpen()) return;
-            yclans.model.ClanPlayer clan_player = yclans_api.getPlayer(p);
-            if(getClanMembers(p) < 1) {
-                yclans_clans.get(clan_player).setFriendlyFireMember(false);
-                yclans_clans.get(clan_player).setFriendlyFireAlly(false);
-                yclans_clans.remove(clan_player);
+        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("ultimateclans") && aEventos.getInstance().isHookedUClans() && !isOpen()) {
+            if(aEventos.getClanMembers(p) < 1) {
+            	setFF(getPlayers(), false);
+            	
+                removeUUID(p.getUniqueId());
             }
         }
 
@@ -199,17 +201,10 @@ public class Sumo extends Evento {
     public void stop() {
 
         // Desative o friendly-fire dos jogadores.
-        for (ClanPlayer p : simpleclans_clans) {
-            p.setFriendlyFire(false);
-        }
 
-        for(MPlayer p: massivefactions_factions.keySet()) {
-            p.getFaction().setFlag(MFlag.ID_FRIENDLYFIRE, false);
-        }
-
-        for(yclans.model.ClanPlayer p: yclans_clans.keySet()) {
-            p.getClan().setFriendlyFireMember(false);
-            p.getClan().setFriendlyFireAlly(false);
+    	
+        for(PlayerData p: uclans_clans.keySet()) {
+            setFFUUID(Arrays.asList(p.getUuid()), false);
         }
 
         // Se o evento for de itens setados, limpe o inventário dos jogadores.
@@ -229,23 +224,5 @@ public class Sumo extends Evento {
 
     }
 
-    private int getClanMembers(Player p) {
-
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("massivefactions")) {
-            return (int) massivefactions_factions.keySet()
-                    .stream()
-                    .filter(map -> map.getFaction() == MPlayer.get(p).getFaction())
-                    .count();
-        }
-
-        if(aEventos.getInstance().getConfig().getString("Hook").equalsIgnoreCase("yclans")) {
-            return (int) yclans_clans.keySet()
-                    .stream()
-                    .filter(map -> map.getClan() == yclans_api.getPlayer(p).getClan())
-                    .count();
-        }
-
-        return -1;
-    }
 
 }
