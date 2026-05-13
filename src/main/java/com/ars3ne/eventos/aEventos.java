@@ -30,7 +30,6 @@ package com.ars3ne.eventos;
 import com.ars3ne.eventos.api.EventoType;
 import com.ars3ne.eventos.commands.EventoCommand;
 import com.ars3ne.eventos.hooks.BungeecordHook;
-import com.ars3ne.eventos.hooks.LegendChatHook;
 import com.ars3ne.eventos.hooks.PlaceholderAPIHook;
 import com.ars3ne.eventos.listeners.EventoListener;
 import com.ars3ne.eventos.manager.*;
@@ -45,7 +44,6 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -63,7 +61,6 @@ public class aEventos extends JavaPlugin {
     private static final CacheManager cache = new CacheManager();
     private final AutoStarter autostart = new AutoStarter();
 
-    private static final LegendChatHook lc_hook = new LegendChatHook();
     private Economy econ = null;
 
     private boolean hooked_uclans = false;
@@ -264,16 +261,13 @@ public class aEventos extends JavaPlugin {
 
     private void removeListeners() {
         HandlerList.unregisterAll(setup_listener);
-        HandlerList.unregisterAll(lc_hook);
     }
 
     private void setupAddons() {
         if(!setupUClans()) {
             Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cUltimateClans não encontrados.");
         }
-        if(!setupLegendChat()) {
-            Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cLegendChat não encontrado.");
-        }
+     
         if(!setupEconomy()) {
             Bukkit.getConsoleSender().sendMessage("§e[aEventos] §cVault não encontrado.");
         }
@@ -282,22 +276,14 @@ public class aEventos extends JavaPlugin {
         }
     }
 
-    private boolean setupLegendChat() {
-        try {
-            Class.forName("br.com.devpaulo.legendchat.api.events.ChatMessageEvent");
-            getServer().getPluginManager().registerEvents(lc_hook, this);
-            return true;
-        }catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
+
 
     private boolean setupUClans() {
     	if(getServer().getPluginManager().isPluginEnabled("UltimateClans")) {
     		UClans uclans = (UClans) getServer().getPluginManager().getPlugin("UltimateClans");
             
             this.hooked_uclans = true;
-            this.api_uclans = uclans;
+            api_uclans = uclans;
             return true;
     	}
 		return false;

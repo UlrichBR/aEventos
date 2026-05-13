@@ -65,11 +65,6 @@
     <version>1.21-R0.4</version>
     <scope>provided</scope>
 </dependency>
-	<dependency>
-	    <groupId>com.github.joaovmundel</groupId>
-	    <artifactId>LegendChat</artifactId>
-	    <version>plugin</version>
-	</dependency>
         <dependency>
             <groupId>com.github.MilkBowl</groupId>
             <artifactId>VaultAPI</artifactId>
